@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SEBI Grade A · IT Officer — Daily Mock Test Arena</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body data-theme="light" data-fontsize="md">
+
+<header class="app-header">
+  <div class="header-left">
+    <div class="logo">S</div>
+    <div>
+      <h1>SEBI Grade A · IT Officer</h1>
+      <p class="subtitle">Daily Mock Test Arena — timed mocks · negative marking · gamified</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="streak-pill" id="streakPill">🔥 0-day streak</div>
+
+    <!-- Daily goal mini ring -->
+    <div class="goal-mini" id="goalMini" title="Daily goal progress">
+      <svg width="44" height="44" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="18" stroke="var(--border)" stroke-width="4" fill="none"></circle>
+        <circle id="goalMiniRing" cx="22" cy="22" r="18" stroke="var(--green)" stroke-width="4" fill="none"
+          stroke-linecap="round" stroke-dasharray="113" stroke-dashoffset="113"></circle>
+      </svg>
+      <div class="goal-label" id="goalMiniLabel">0/3</div>
+    </div>
+
+    <!-- Level chip -->
+    <button class="level-chip" id="levelChip" title="Open profile &amp; report card">
+      <span>⭐</span>
+      <span class="lvl-num" id="levelChipNum">L1</span>
+    </button>
+
+    <!-- Settings -->
+    <button class="icon-btn" id="settingsBtn" title="Exam settings">⚙</button>
+
+    <!-- Dark mode toggle -->
+    <button class="icon-btn" id="themeToggleBtn" title="Toggle dark mode">☾</button>
+
+    <!-- Sign out -->
+    <button class="icon-btn" id="signOutBtn" title="Sign out" style="display:none">↪</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- AUTH SCREEN -->
+  <section id="authScreen">
+    <div class="card auth-card">
+      <div class="logo" style="width:64px;height:64px;font-size:28px;margin:0 auto 14px;">S</div>
+      <h2 id="authTitle" style="margin:0 0 4px;text-align:center;">Welcome back</h2>
+      <p class="muted" id="authSubtitle" style="text-align:center;margin:0 0 18px;">Sign in to keep your progress synced</p>
+
+      <form id="authForm">
+        <label class="auth-field">Email
+          <input type="email" id="authEmail" autocomplete="email" required />
+        </label>
+        <label class="auth-field">Password
+          <input type="password" id="authPassword" autocomplete="current-password" minlength="6" required />
+        </label>
+        <p id="authError" class="error"></p>
+        <button type="submit" class="btn btn-primary" id="authSubmitBtn" style="width:100%;">Sign in</button>
+      </form>
+      <button class="btn btn-ghost" id="authToggleBtn" style="width:100%;margin-top:10px;">New here? Create an account</button>
+    </div>
+  </section>
+
+  <!-- LOAD SCREEN -->
+  <section id="loadScreen">
+    <div class="card">
+      <h2 style="margin-top:0;">Load a question paper</h2>
+      <p class="muted">Upload a JSON mock file, or start with the built-in sample.</p>
+
+      <label class="file-drop" for="fileInput">
+        <span class="file-drop-icon">📄</span>
+        <span>
+          <strong id="fileNameDisplay">Choose a .json question file</strong><br />
+          <span class="muted">question packs generated for your prep</span>
+        </span>
+      </label>
+      <input type="file" id="fileInput" accept=".json,application/json" class="hidden" />
+
+      <div class="divider">or</div>
+
+      <button id="loadSampleBtn" class="btn btn-primary">⚡ Load Built-in Sample</button>
+      <p id="loadError" class="error"></p>
+    </div>
+  </section>
+
+  <!-- START SCREEN -->
+  <section id="startScreen" class="hidden">
+    <div class="card">
+      <h2 id="startExamName" style="margin-top:0;"></h2>
+      <div id="startChips"></div>
+      <div id="startSettingsSummary" style="margin-top:12px;"></div>
+      <div style="margin-top:18px; display:flex; gap:12px; flex-wrap:wrap;">
+        <button id="startTestBtn" class="btn btn-primary">🚀 Start Test</button>
+        <button id="backToLoadBtn" class="btn btn-ghost">Choose Another File</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('settingsBtn').click()">⚙ Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEST SCREEN -->
+  <section id="testScreen" class="hidden">
+    <div class="card test-header">
+      <div>
+        <div id="examTitle" class="exam-title"></div>
+        <div id="paperTitle" class="muted"></div>
+      </div>
+      <div id="timer" class="timer-pill">00:00</div>
+      <button id="submitBtn" class="btn btn-danger">Submit</button>
+    </div>
+
+    <div class="test-layout">
+      <div class="card">
+        <div id="questionChips"></div>
+        <div id="questionText" class="question-text"></div>
+        <pre id="codeBlock" class="code hidden"></pre>
+        <div id="options" class="options"></div>
+
+        <div class="controls">
+          <button id="prevBtn" class="btn btn-ghost">← Previous</button>
+          <button id="clearBtn" class="btn btn-ghost">Clear Response</button>
+          <button id="markBtn" class="btn btn-ghost">🔖 Mark for Review</button>
+          <button id="nextBtn" class="btn btn-primary">Save &amp; Next →</button>
+        </div>
+      </div>
+
+      <aside class="card">
+        <h3 style="margin-top:0;">Question Palette</h3>
+        <div id="palette" class="palette"></div>
+        <div class="legend">
+          <div class="legend-item"><span class="dot answered"></span> Answered</div>
+          <div class="legend-item"><span class="dot unanswered"></span> Unanswered / Visited</div>
+          <div class="legend-item"><span class="dot marked"></span> Marked for Review</div>
+          <div class="legend-item"><span class="dot"></span> Not Visited</div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- RESULT SCREEN -->
+  <section id="resultScreen" class="hidden">
+    <div class="card">
+      <div class="result-layout">
+        <div class="ring-container">
+          <svg width="280" height="280" viewBox="0 0 280 280">
+            <circle cx="140" cy="140" r="118" stroke="var(--border)" stroke-width="24" fill="none"></circle>
+            <circle id="ringProgress" cx="140" cy="140" r="118" stroke="#6d5be7" stroke-width="24"
+              fill="none" stroke-linecap="round" transform="rotate(-90 140 140)"></circle>
+          </svg>
+          <div class="ring-center">
+            <div id="ringScore" class="ring-score">0.0</div>
+            <div id="ringLabel" class="ring-label">NET / 0</div>
+          </div>
+        </div>
+
+        <div>
+          <h2 id="resultTitle" style="margin:0;"></h2>
+          <p id="resultSubtitle" class="muted"></p>
+
+          <div class="stats-grid">
+            <div class="stat"><div id="statCorrect" class="value green"></div><div class="label">Correct (+marks)</div></div>
+            <div class="stat"><div id="statWrong" class="value red"></div><div class="label">Wrong (−¼)</div></div>
+            <div class="stat"><div id="statAttempted" class="value"></div><div class="label">Attempted / Total</div></div>
+            <div class="stat"><div id="statAccuracy" class="value purple"></div><div class="label">Accuracy (attempted)</div></div>
+            <div class="stat"><div id="statTime" class="value"></div><div class="label">Time used</div></div>
+            <div class="stat"><div id="statPace" class="value"></div><div class="label">Avg pace vs official</div></div>
+          </div>
+
+          <!-- XP banner -->
+          <div class="xp-banner" id="xpBanner"></div>
+
+          <div class="target-card">
+            <div class="heading">🎯 SUGGESTED TIME LIMIT FOR YOUR NEXT MOCK</div>
+            <div style="margin:8px 0;">
+              <span id="targetTime" class="target-time"></span>
+              <span id="targetNote" class="target-note"></span>
+            </div>
+            <p id="targetMessage" style="margin:8px 0;"></p>
+            <p class="target-tip">💡 Next target: shave ~10% off your projected time. In the real exam this cushion covers the marking-screen + panic buffer.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button id="retakeBtn" class="btn btn-primary">↻ Retake same mock</button>
+        <button id="anotherBtn" class="btn btn-teal">🏠 Another test</button>
+        <button id="reviewBtn" class="btn btn-ghost">📖 Show review</button>
+        <button id="resultCsvBtn" class="btn btn-ghost">⬇ CSV report</button>
+        <button id="resultPdfBtn" class="btn btn-amber">⬇ PDF report card</button>
+      </div>
+
+      <div id="reviewContainer" class="hidden"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============================= SETTINGS MODAL ============================= -->
+<div class="modal-backdrop hidden" id="settingsBackdrop">
+  <div class="modal" id="settingsModal">
+    <div class="modal-header">
+      <h2>⚙ Exam Settings</h2>
+      <button class="modal-close" id="settingsCloseBtn">✕</button>
+    </div>
+
+    <div class="setting-row">
+      <label>Theme</label>
+      <div class="seg" id="themeSeg">
+        <button data-val="light">☀ Light</button>
+        <button data-val="dark">☾ Dark</button>
+      </div>
+      <div class="hint">Dark theme for late-night study sessions.</div>
+    </div>
+
+    <div class="setting-row">
+      <label>Font size</label>
+      <div class="seg" id="fontSeg">
+        <button data-val="sm">A−</button>
+        <button data-val="md">A</button>
+        <button data-val="lg">A+</button>
+        <button data-val="xl">A++</button>
+      </div>
+      <div class="hint">Scales all text in the app — useful for long reading sessions.</div>
+    </div>
+
+    <div class="setting-row">
+      <label>Timer position</label>
+      <div class="seg" id="timerPosSeg">
+        <button data-val="top">⬆ Top</button>
+        <button data-val="bottom">⬇ Bottom</button>
+      </div>
+      <div class="hint">Move the countdown where it interferes least with your reading.</div>
+    </div>
+
+    <div class="setting-row">
+      <label>5-minute sound alert</label>
+      <label class="toggle">
+        <input type="checkbox" id="soundToggle" />
+        <span class="slider"></span>
+      </label>
+      <button class="btn btn-ghost" id="testBeepBtn" style="margin-left:12px;padding:8px 14px;font-size:13px;">🔊 Test beep</button>
+      <div class="hint">Plays a triple-beep when 5 minutes remain (uses WebAudio — no file needed).</div>
+    </div>
+
+    <div class="setting-row">
+      <label>Shuffle questions</label>
+      <label class="toggle">
+        <input type="checkbox" id="shuffleToggle" />
+        <span class="slider"></span>
+      </label>
+      <div class="hint">Randomises question order on every Start Test — prevents memorising positions.</div>
+    </div>
+
+    <div class="setting-row">
+      <label>Daily goal (mocks/day)</label>
+      <input type="number" id="dailyGoalInput" min="1" max="20" value="3"
+        style="width:90px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card-2);color:var(--ink);font-weight:700;font-family:inherit;" />
+      <div class="hint">Sets the target in the header ring + counts towards the "Goal Getter" badge.</div>
+    </div>
+
+    <p class="muted" style="font-size:12px;margin-top:16px;">💾 All preferences are saved to your browser's localStorage and persist across sessions.</p>
+  </div>
+</div>
+
+<!-- ============================= PROFILE MODAL ============================= -->
+<div class="modal-backdrop hidden" id="profileBackdrop">
+  <div class="modal" id="profileModal">
+    <div class="modal-header">
+      <h2>🏆 Your Profile &amp; Report Card</h2>
+      <button class="modal-close" id="profileCloseBtn">✕</button>
+    </div>
+
+    <div class="profile-top">
+      <div class="level-ring">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r="58" stroke="var(--border)" stroke-width="10" fill="none"></circle>
+          <circle id="profileLevelRing" cx="70" cy="70" r="58" stroke="url(#lvlGrad)" stroke-width="10" fill="none"
+            stroke-linecap="round" stroke-dasharray="364" stroke-dashoffset="0" transform="rotate(-90 70 70)"></circle>
+          <defs>
+            <linearGradient id="lvlGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#6d5be7"/>
+              <stop offset="100%" stop-color="#a855f7"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="lr-center">
+          <div class="lr-num" id="profileLevelNum">1</div>
+          <div class="lr-label">LEVEL</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Total XP</div>
+        <div style="font-size:28px;font-weight:800;color:var(--purple);" id="profileTotalXP">0 XP</div>
+        <div class="xp-bar-wrap"><div class="xp-bar" id="profileXPBar" style="width:0%"></div></div>
+        <div class="xp-text" id="profileXPText">0 / 100 XP to next level</div>
+        <div style="margin-top:10px;font-size:13px;color:var(--muted);">
+          📝 <strong id="profileAttempts">0</strong> mocks attempted
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily goal tracker -->
+    <div class="goal-tracker">
+      <div class="goal-ring-big">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <circle cx="35" cy="35" r="30" stroke="var(--border)" stroke-width="6" fill="none"></circle>
+          <circle id="goalBigRing" cx="35" cy="35" r="30" stroke="var(--green)" stroke-width="6" fill="none"
+            stroke-linecap="round" stroke-dasharray="188" stroke-dashoffset="188"></circle>
+        </svg>
+        <div class="gr-label" id="goalBigLabel">0/3</div>
+      </div>
+      <div id="goalBigText" style="font-size:14px;"><strong>0 / 3</strong> mocks today</div>
+    </div>
+
+    <!-- Badges -->
+    <h3 style="margin:22px 0 4px;font-size:16px;">🎖 Badges</h3>
+    <div class="badges-grid" id="badgesGrid"></div>
+
+    <!-- Attempt history -->
+    <h3 style="margin:22px 0 4px;font-size:16px;">📋 Attempt History</h3>
+    <div id="historyTableWrap"></div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;">
+      <button class="btn btn-ghost" id="downloadCsvBtn" style="flex:1;min-width:160px;">⬇ Download CSV</button>
+      <button class="btn btn-amber" id="downloadPdfBtn" style="flex:1;min-width:160px;">⬇ Download PDF report card</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================= REPORT CARD PRINT MODAL ============================= -->
+<div class="modal-backdrop hidden" id="reportBackdrop">
+  <div class="modal" id="reportModal" style="max-width:880px;">
+    <div class="modal-header">
+      <h2>📄 Report Card Preview</h2>
+      <button class="modal-close" id="reportCloseBtn">✕</button>
+    </div>
+    <p class="muted" style="margin:0 0 14px;">This is exactly what will be saved as PDF. Use your browser's print dialog to "Save as PDF".</p>
+    <div id="reportPrintArea"></div>
+  </div>
+</div>
+
+<!-- ============================= LEVEL UP OVERLAY ============================= -->
+<div class="levelup-overlay hidden" id="levelupOverlay">
+  <div class="levelup-card">
+    <div class="lu-icon">🎉</div>
+    <div class="lu-title" id="luLevel">Level Up!</div>
+    <div class="lu-sub">Great work — keep the streak going.</div>
+    <div id="luBadges"></div>
+    <button class="btn btn-primary" style="margin-top:20px;" onclick="document.getElementById('levelupOverlay').classList.add('hidden')">Continue →</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
