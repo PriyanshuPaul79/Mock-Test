@@ -250,16 +250,20 @@ const el = id => document.getElementById(id);
   }
   let gamo = Object.assign({}, defaultGamo);
 
-  // XP needed for a level: simplified curve — level N requires 100 * N XP cumulative
-  function xpForLevel(lvl) { return 100 * lvl * (lvl + 1) / 2; }
+  // XP needed for a level: Level 1 = 0 XP, Level 2 = 100 XP, Level 3 = 300 XP, etc.
+  function xpForLevel(lvl) {
+    if (lvl <= 1) return 0;
+    return 100 * (lvl - 1) * lvl / 2;
+  }
   function levelFromXP(xp) {
+    xp = Math.max(0, Number(xp) || 0);
     let lvl = 1;
     while (xpForLevel(lvl + 1) <= xp) lvl++;
     const curBase = xpForLevel(lvl);
     const nextBase = xpForLevel(lvl + 1);
     const intoLevel = xp - curBase;
     const span = nextBase - curBase;
-    const pct = span > 0 ? (intoLevel / span) * 100 : 0;
+    const pct = span > 0 ? Math.min(100, Math.max(0, (intoLevel / span) * 100)) : 0;
     return { level: lvl, intoLevel: intoLevel, span: span, pct: pct, nextBase: nextBase };
   }
 
@@ -1217,6 +1221,13 @@ const el = id => document.getElementById(id);
   let lastUserId = null;
 
   function showAuth() {
+    lastUserId = null;
+    gamo = Object.assign({}, defaultGamo);
+    streakData = { lastDate: null, streak: 0, best: 0 };
+    resetApp();
+    displayStreak();
+    renderHeaderGamification();
+    renderProfile();
     ["loadScreen", "startScreen", "testScreen", "resultScreen"].forEach(id => el(id).classList.add("hidden"));
     ["settingsModal", "profileModal", "reportModal"].forEach(id => hideModal(id));
     authScreen.classList.remove("hidden");
@@ -1270,7 +1281,6 @@ const el = id => document.getElementById(id);
 
     signOutBtn.addEventListener("click", () => sb.auth.signOut());
 
-    // One-time lift of any old localStorage progress into the account
     async function migrateLocalData() {
       let local;
       try { local = JSON.parse(localStorage.getItem(GAMO_KEY)); } catch (e) { return; }
@@ -1286,59 +1296,56 @@ const el = id => document.getElementById(id);
       gamo.badges = local.badges || [];
       gamo.history = local.history;
 
-      await sb.from("attempts").insert(local.history.map(h => ({
-        user_id: currentUser.id,
-        date: h.date, exam: h.exam, paper: h.paper || "", file_name: h.fileName || "",
-        total: h.total, correct: h.correct, wrong: h.wrong, unattempted: h.unattempted,
-        attempted: h.attempted, accuracy: h.accuracy, score: h.score, max_marks: h.maxMarks,
-        time_used: h.timeUsed, time_limit: h.timeLimit, xp: h.xp, subjects: h.subjects || {}
-      })));
+      if (sb && currentUser) {
+        await sb.from("attempts").insert(local.history.map(h => ({
+          user_id: currentUser.id,
+          date: h.date, exam: h.exam, paper: h.paper || "", file_name: h.fileName || "",
+          total: h.total, correct: h.correct, wrong: h.wrong, unattempted: h.unattempted,
+          attempted: h.attempted, accuracy: h.accuracy, score: h.score, max_marks: h.maxMarks,
+          time_used: h.timeUsed, time_limit: h.timeLimit, xp: h.xp, subjects: h.subjects || {}
+        })));
 
-      let s;
-      try { s = JSON.parse(localStorage.getItem(STREAK_KEY)); } catch (e2) {}
-      if (s && streakData.streak === 0) {
-        streakData = { lastDate: s.lastDate, streak: s.streak || 0, best: s.best || 0 };
+        let s;
+        try { s = JSON.parse(localStorage.getItem(STREAK_KEY)); } catch (e2) {}
+        if (s && streakData.streak === 0) {
+          streakData = { lastDate: s.lastDate, streak: s.streak || 0, best: s.best || 0 };
+        }
+        localStorage.removeItem(GAMO_KEY);
+        localStorage.removeItem(STREAK_KEY);
+        await saveProfile();
       }
-      localStorage.removeItem(GAMO_KEY);
-      localStorage.removeItem(STREAK_KEY);
-      await saveProfile();
     }
 
-    async function bootUser() {
+    async function bootUser(authEvent) {
+      if (!currentUser) return showAuth();
       const uid = currentUser.id;
       if (gamo && uid === lastUserId) {
         // same user, duplicate auth event — shows whatever we already have
         displayStreak();
         renderHeaderGamification();
+        renderProfile();
         showApp();
         return;
       }
       lastUserId = uid;
       const myBoot = ++bootToken;
 
-      const { data: prof } = await sb.from("profiles")
-        .select("total_xp, badges, streak, streak_last_date, streak_best")
-        .eq("id", currentUser.id)
-        .maybeSingle();
-      let profRow = prof || null;
-      if (!profRow) {
-        const { error: insErr } = await saveProfile();
-        if (insErr) {
-          authError.textContent = "Profile row missing — did you run schema.sql? (" + insErr.message + ")";
-        } else {
-          profRow = { total_xp: 0, badges: [], streak: 0, streak_last_date: null, streak_best: 0 };
-        }
-      }
-      const { data: attempts } = await sb.from("attempts")
-        .select("*")
-        .eq("user_id", currentUser.id)
-        .order("created_at", { ascending: false })
-        .limit(500);
+      try {
+        const { data: prof } = await sb.from("profiles")
+          .select("total_xp, badges, streak, streak_last_date, streak_best")
+          .eq("id", currentUser.id)
+          .maybeSingle();
+        let profRow = prof || null;
 
-      gamo = {
-        totalXP: profRow ? profRow.total_xp : 0,
-        badges: profRow && profRow.badges ? profRow.badges : [],
-        history: (attempts || []).map(h => ({
+        const { data: attempts } = await sb.from("attempts")
+          .select("*")
+          .eq("user_id", currentUser.id)
+          .order("created_at", { ascending: false })
+          .limit(500);
+
+        if (myBoot !== bootToken) return; // a newer session started — discard stale fetch
+
+        const historyList = (attempts || []).map(h => ({
           id: h.id, date: h.date, timestamp: h.created_at,
           exam: h.exam, paper: h.paper, fileName: h.file_name,
           total: h.total, correct: h.correct, wrong: h.wrong,
@@ -1346,28 +1353,51 @@ const el = id => document.getElementById(id);
           accuracy: h.accuracy, score: Number(h.score), maxMarks: Number(h.max_marks),
           timeUsed: h.time_used, timeLimit: h.time_limit, xp: h.xp,
           subjects: h.subjects
-        })),
-        lastLevelShown: 1
-      };
-      streakData = {
-        lastDate: profRow ? profRow.streak_last_date : null,
-        streak: profRow ? profRow.streak : 0,
-        best: profRow ? profRow.streak_best : 0
-      };
+        }));
 
-      await migrateLocalData();
+        const attemptsXP = historyList.reduce((sum, h) => sum + (Number(h.xp) || 0), 0);
+        const dbXP = profRow ? (Number(profRow.total_xp) || 0) : 0;
+        const totalXP = Math.max(dbXP, attemptsXP);
 
-      if (myBoot !== bootToken) return; // a newer session started — discard stale fetch
+        gamo = {
+          totalXP: totalXP,
+          badges: profRow && profRow.badges ? profRow.badges : [],
+          history: historyList,
+          lastLevelShown: 1
+        };
+        streakData = {
+          lastDate: profRow ? profRow.streak_last_date : null,
+          streak: profRow ? (profRow.streak || 0) : 0,
+          best: profRow ? (profRow.streak_best || 0) : 0
+        };
 
-      displayStreak();
-      renderHeaderGamification();
-      showApp();
-      signOutBtn.title = "Sign out · " + currentUser.email;
+        if (gamo.history.length === 0) {
+          await migrateLocalData();
+        }
+
+        if (!profRow) {
+          const { error: insErr } = await saveProfile();
+          if (insErr) {
+            authError.textContent = "Profile row missing — did you run schema.sql? (" + insErr.message + ")";
+          }
+        }
+
+        console.log("[boot]", authEvent, uid, "xp:", gamo.totalXP, "attempts:", gamo.history.length, "streak:", streakData.streak);
+
+        displayStreak();
+        renderHeaderGamification();
+        renderProfile();
+        showApp();
+        signOutBtn.title = "Sign out · " + currentUser.email;
+      } catch (err) {
+        console.error("Error booting user:", err);
+        showApp();
+      }
     }
 
     sb.auth.onAuthStateChange((event, sess) => {
       currentUser = sess ? sess.user : null;
-      if (currentUser) bootUser();
+      if (currentUser) bootUser(event);
       else showAuth();
     });
   }
