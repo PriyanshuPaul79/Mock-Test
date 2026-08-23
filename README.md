@@ -110,3 +110,10 @@ Every question paper must have this structure:
 
 
 
+Scoring Rules
+The app uses the following scoring logic:
+
+Answer Type                 |Score
+Correct                     |+marks
+Wrong                       |-(marks × negative_marking)
+Unattempted                 |0
